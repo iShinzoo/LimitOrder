@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from "next/server"
 
-const CHAIN_ID = 11155111 // Sepolia testnet
+const CHAIN_ID = 137 // Polygon mainnet
 const API_BASE_URL = "https://api.1inch.dev/orderbook/v4.0"
 
 /**
@@ -15,12 +15,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { order, signature } = body
+    const { orderHash, signature, data } = body
 
     // Validate required fields
-    if (!order || !signature) {
+    if (!orderHash || !signature || !data) {
       return NextResponse.json(
-        { message: "Missing required fields: order and signature" },
+        { message: "Missing required fields: orderHash, signature, and data" },
         { status: 400 }
       )
     }
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     // Validate order structure
     const requiredFields = ['makerAsset', 'takerAsset', 'makingAmount', 'takingAmount', 'maker', 'receiver', 'salt', 'makerTraits']
     for (const field of requiredFields) {
-      if (!(field in order)) {
+      if (!(field in data)) {
         return NextResponse.json(
           { message: `Missing required order field: ${field}` },
           { status: 400 }
@@ -36,16 +36,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Submit order to 1inch API using the correct endpoint
-    const url = `${API_BASE_URL}/${CHAIN_ID}/limit-order/order`
+    // Submit order to 1inch API using the correct endpoint and body
+    const url = `${API_BASE_URL}/${CHAIN_ID}`
     console.log("API_BASE_URL:", API_BASE_URL)
     console.log("CHAIN_ID:", CHAIN_ID)
     console.log("Constructed URL:", url)
     console.log("Submitting to 1inch API:", url)
     console.log("Request payload:", JSON.stringify({
-      order,
+      orderHash,
       signature,
-      extension: "0x"
+      data
     }, null, 2))
 
     const response = await fetch(url, {
@@ -55,9 +55,9 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        order,
+        orderHash,
         signature,
-        extension: "0x" // Empty extension for basic orders
+        data
       }),
     })
 

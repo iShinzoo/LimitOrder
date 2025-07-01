@@ -40,9 +40,9 @@ const erc20AbiFragment = [
   "function symbol() external view returns (string)"
 ]
 
-// Sepolia testnet configuration
-const SEPOLIA_CHAIN_ID = 11155111
-const SEPOLIA_LIMIT_ORDER_CONTRACT = "0x1111111254EEB25477B68fb85Ed929f73A960582" // 1inch Limit Order Protocol v4 on Sepolia
+// Polygon mainnet configuration
+const POLYGON_CHAIN_ID = 137
+const POLYGON_LIMIT_ORDER_CONTRACT = "0x1111111254EEB25477B68fb85Ed929f73A960582" // 1inch Limit Order Protocol v4 on Polygon
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined)
 
@@ -56,11 +56,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     if (!signer || !account || !provider) {
       throw new Error("Wallet not connected")
     }
-
-    // Use Sepolia chain ID for testing
-    const chainId = SEPOLIA_CHAIN_ID
-    const limitOrderContractAddress = SEPOLIA_LIMIT_ORDER_CONTRACT
-
+    // Use Polygon chain ID
+    const chainId = POLYGON_CHAIN_ID
+    const limitOrderContractAddress = POLYGON_LIMIT_ORDER_CONTRACT
     const tokenContract = new ethers.Contract(tokenAddress, erc20AbiFragment, signer)
 
     try {
@@ -136,8 +134,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         salt
       })
 
-      // Get the domain for Sepolia testnet
-      const chainId = SEPOLIA_CHAIN_ID
+      // Get the domain for Polygon mainnet
+      const chainId = POLYGON_CHAIN_ID
       const domain = getLimitOrderV4Domain(chainId)
       
       // Get typed data for signing
@@ -168,7 +166,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          order: {
+          orderHash,
+          signature,
+          data: {
             makerAsset: orderData.makerAsset,
             takerAsset: orderData.takerAsset,
             makingAmount: makingAmount.toString(),
@@ -176,9 +176,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             maker: account,
             receiver: account,
             salt: salt.toString(),
-            makerTraits: makerTraitsString // Use the string representation
-          },
-          signature
+            makerTraits: makerTraitsString,
+            extension: "0x"
+          }
         }),
       })
 

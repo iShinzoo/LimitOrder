@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from "next/server"
 
-const CHAIN_ID = 1
+const CHAIN_ID = 137 // Polygon mainnet
 const DEFAULT_BASE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE" // ETH
 const DEFAULT_QUOTE = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" // USDC
 

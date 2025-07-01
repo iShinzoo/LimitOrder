@@ -1,6 +1,6 @@
 # Crypto Limit Orders
 
-A Next.js application for creating and managing limit orders using the 1inch Orderbook API on **Sepolia Testnet**.
+A Next.js application for creating and managing limit orders using the 1inch Orderbook API on **Polygon Mainnet**.
 
 ## Features
 
@@ -9,9 +9,9 @@ A Next.js application for creating and managing limit orders using the 1inch Ord
 - **Limit Order Creation**: Create buy/sell limit orders with customizable parameters
 - **Order Management**: View active orders and order history
 - **Order Cancellation**: Cancel active orders
-- **Token Support**: Support for WETH, USDC, USDT, DAI, and WBTC on Sepolia testnet
+- **Token Support**: Support for WETH, USDC, USDT, DAI, and WBTC on Polygon mainnet
 - **Responsive UI**: Modern, responsive interface built with Tailwind CSS and shadcn/ui
-- **Testnet Support**: Configured for Sepolia testnet for easy testing
+- **Network Support**: Configured for Polygon mainnet
 
 ## Tech Stack
 
@@ -20,7 +20,7 @@ A Next.js application for creating and managing limit orders using the 1inch Ord
 - **Web3**: Ethers.js for wallet integration
 - **APIs**: 1inch Price API and Orderbook API
 - **Notifications**: Sonner for toast notifications
-- **Network**: Sepolia Testnet
+- **Network**: Polygon Mainnet
 
 ## Setup
 
@@ -54,34 +54,31 @@ A Next.js application for creating and managing limit orders using the 1inch Ord
 6. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-## Testing with Sepolia Testnet
+## Using Polygon Mainnet
 
-This application is configured to work with **Sepolia Testnet** for easy testing without requiring real ETH.
+This application is configured to work with **Polygon Mainnet**.
 
-### Getting Test Tokens
+### Polygon Token Addresses
 
-1. **Sepolia ETH**: Get free Sepolia ETH from faucets:
-   - [Sepolia Faucet](https://sepoliafaucet.com/)
-   - [Alchemy Sepolia Faucet](https://sepoliafaucet.com/)
-
-2. **Test Tokens**: The app uses these Sepolia testnet token addresses:
-   - **WETH**: `0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9`
-   - **USDC**: `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`
-   - **USDT**: `0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0`
-   - **DAI**: `0x68194a729C2450ad26072b3D33ADaCbcef39D574`
+2. **Tokens**: The app uses these Polygon mainnet token addresses:
+   - **WETH**: (update with Polygon WETH address)
+   - **USDC**: (update with Polygon USDC address)
+   - **USDT**: (update with Polygon USDT address)
+   - **DAI**: (update with Polygon DAI address)
+   - **WBTC**: (update with Polygon WBTC address)
 
 ### Setting up MetaMask
 
-1. **Add Sepolia Network**: The app will automatically prompt you to add Sepolia to MetaMask
-2. **Switch to Sepolia**: The app will automatically switch to Sepolia when you connect
-3. **Import Test Tokens**: You can import the test tokens using their addresses above
+1. **Add Polygon Network**: The app will automatically prompt you to add Polygon to MetaMask
+2. **Switch to Polygon**: The app will automatically switch to Polygon when you connect
+3. **Import Tokens**: You can import the tokens using their addresses above
 
 ## Usage
 
 ### Connecting Wallet
 1. Click "Connect Wallet" in the header
 2. Approve the connection in your wallet (MetaMask, etc.)
-3. The app will automatically switch to Sepolia testnet
+3. The app will automatically switch to Polygon mainnet
 4. Your wallet address will be displayed in the header
 
 ### Creating Limit Orders
@@ -100,35 +97,18 @@ This application is configured to work with **Sepolia Testnet** for easy testing
 
 ## Important Notes
 
-- **Testnet Only**: This application is configured for Sepolia testnet only
-- **No Real Money**: All transactions use test tokens and test ETH
+- **Polygon Mainnet Only**: This application is configured for Polygon mainnet only
 - **Token Approvals**: The app will automatically request token approvals when needed
 - **Order Expiration**: Orders expire after the selected time period
-- **Network Switching**: The app automatically handles network switching to Sepolia
+- **Network Switching**: The app automatically handles network switching to Polygon
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"Failed to connect wallet"**
-   - Make sure MetaMask is installed
-   - Ensure you're on Sepolia testnet
-   - Try refreshing the page
-
-2. **"Token approval failed"**
-   - Check that you have enough Sepolia ETH for gas fees
-   - Try approving a smaller amount first
-
-3. **"Order creation failed"**
-   - Verify you have sufficient token balance
-   - Check that the 1inch API key is configured correctly
-   - Ensure you're connected to Sepolia testnet
-
-### Getting Help
-
-- Check the browser console for detailed error messages
-- Verify your MetaMask is connected to Sepolia testnet
-- Ensure you have sufficient test tokens and Sepolia ETH
+- Make sure you have MATIC for gas fees on Polygon mainnet
+- Ensure MetaMask is set to Polygon mainnet
+- If tokens are not visible, import them manually using the addresses above
 
 ## API Endpoints
 

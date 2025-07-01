@@ -27,6 +27,8 @@ export function OrderForm() {
   const { isConnected } = useWallet()
   const { createOrder, isLoading } = useOrders()
   const [tokens, setTokens] = useState<Token[]>([])
+  const [payToken, setPayToken] = useState<Token | null>(null)
+  const [receiveToken, setReceiveToken] = useState<Token | null>(null)
 
   const [orderType, setOrderType] = useState<"buy" | "sell">("buy")
   const [price, setPrice] = useState("")
@@ -40,6 +42,11 @@ export function OrderForm() {
       .then((res) => res.json())
       .then((data) => {
         setTokens(data.tokens)
+        // Set defaults: pay with WMATIC, receive USDC
+        const defaultPay = data.tokens.find((t: Token) => t.symbol === "WMATIC") || data.tokens[0]
+        const defaultReceive = data.tokens.find((t: Token) => t.symbol === "USDC") || data.tokens[1]
+        setPayToken(defaultPay)
+        setReceiveToken(defaultReceive)
       })
       .catch((error) => {
         console.error("Failed to load token list:", error)
@@ -68,42 +75,35 @@ export function OrderForm() {
     if (!validateForm()) return
 
     try {
-      // Get WETH and USDC tokens from the list
-      const wethToken = tokens.find(t => t.symbol === "WETH")
-      const usdcToken = tokens.find(t => t.symbol === "USDC")
-
-      if (!wethToken || !usdcToken) {
-        toast.error("Required tokens not found")
+      if (!payToken || !receiveToken) {
+        toast.error("Please select both pay and receive tokens")
         return
       }
-
+      if (payToken.address === receiveToken.address) {
+        toast.error("Pay and receive tokens must be different")
+        return
+      }
       const priceValue = Number.parseFloat(price)
       const amountValue = Number.parseFloat(amount)
 
+      // Calculate making/taking amounts based on pay/receive
+      // makingAmount: how much you pay (in payToken)
+      // takingAmount: how much you want to receive (in receiveToken)
+      const makingAmount = (amountValue * Math.pow(10, payToken.decimals)).toString()
+      const takingAmount = (amountValue * priceValue * Math.pow(10, receiveToken.decimals)).toString()
+
       const orderData = {
-        makerAsset:
-          orderType === "sell"
-            ? wethToken.address // WETH
-            : usdcToken.address, // USDC
-        takerAsset:
-          orderType === "sell"
-            ? usdcToken.address // USDC
-            : wethToken.address, // WETH
-        makingAmount:
-          orderType === "sell"
-            ? (amountValue * Math.pow(10, wethToken.decimals)).toString()
-            : (amountValue * priceValue * Math.pow(10, usdcToken.decimals)).toString(),
-        takingAmount:
-          orderType === "sell"
-            ? (amountValue * priceValue * Math.pow(10, usdcToken.decimals)).toString()
-            : (amountValue * Math.pow(10, wethToken.decimals)).toString(),
+        makerAsset: payToken.address,
+        takerAsset: receiveToken.address,
+        makingAmount,
+        takingAmount,
         expiration: getExpirationTimestamp(expiration),
       }
 
       await createOrder(orderData)
 
       // Show success message
-      toast.success(`${orderType.toUpperCase()} order created successfully!`, {
+      toast.success(`Order created successfully!`, {
         icon: <CheckCircle className="h-4 w-4" />,
       })
 
@@ -140,6 +140,44 @@ export function OrderForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Label>Pay with</Label>
+              <Select value={payToken?.address} onValueChange={val => setPayToken(tokens.find(t => t.address === val) || null)}>
+                <SelectTrigger>
+                  <SelectValue>{payToken ? payToken.symbol : "Select"}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {tokens.map(token => (
+                    <SelectItem key={token.address} value={token.address}>
+                      <span className="inline-flex items-center gap-2">
+                        <img src={token.logoURI} alt={token.symbol} className="w-4 h-4 rounded-full" />
+                        {token.symbol}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <Label>Receive</Label>
+              <Select value={receiveToken?.address} onValueChange={val => setReceiveToken(tokens.find(t => t.address === val) || null)}>
+                <SelectTrigger>
+                  <SelectValue>{receiveToken ? receiveToken.symbol : "Select"}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {tokens.map(token => (
+                    <SelectItem key={token.address} value={token.address}>
+                      <span className="inline-flex items-center gap-2">
+                        <img src={token.logoURI} alt={token.symbol} className="w-4 h-4 rounded-full" />
+                        {token.symbol}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <Tabs value={orderType} onValueChange={(value) => setOrderType(value as "buy" | "sell")}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="buy" className="text-green-600">
@@ -149,10 +187,9 @@ export function OrderForm() {
                 Sell
               </TabsTrigger>
             </TabsList>
-
             <TabsContent value={orderType} className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="price">Price (USDC)</Label>
+                <Label htmlFor="price">Price ({receiveToken ? receiveToken.symbol : "Token"})</Label>
                 <Input
                   id="price"
                   type="number"
@@ -164,9 +201,8 @@ export function OrderForm() {
                 />
                 {errors.price && <div className="text-sm text-destructive">{errors.price}</div>}
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount (WETH)</Label>
+                <Label htmlFor="amount">Amount ({payToken ? payToken.symbol : "Token"})</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -178,7 +214,6 @@ export function OrderForm() {
                 />
                 {errors.amount && <div className="text-sm text-destructive">{errors.amount}</div>}
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="expiration">Expiration</Label>
                 <Select value={expiration} onValueChange={setExpiration}>
@@ -192,22 +227,20 @@ export function OrderForm() {
                   </SelectContent>
                 </Select>
               </div>
-
-              {price && amount && (
+              {price && amount && payToken && receiveToken && (
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="text-sm space-y-1">
                     <div className="flex justify-between">
                       <span>Total:</span>
                       <span className="font-medium">
-                        {(Number.parseFloat(price) * Number.parseFloat(amount)).toFixed(2)} USDC
+                        {(Number.parseFloat(price) * Number.parseFloat(amount)).toFixed(2)} {receiveToken.symbol}
                       </span>
                     </div>
                   </div>
                 </div>
               )}
-
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating Order..." : `Place ${orderType} Order`}
+                {isLoading ? "Creating Order..." : `Place Order`}
               </Button>
             </TabsContent>
           </Tabs>

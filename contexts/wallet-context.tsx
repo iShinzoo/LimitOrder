@@ -11,23 +11,23 @@ interface WalletContextType {
   isConnecting: boolean
   connect: () => Promise<void>
   disconnect: () => void
-  switchToSepolia: () => Promise<void>
+  switchToPolygon: () => Promise<void>
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
 
-// Sepolia testnet configuration
-const SEPOLIA_CHAIN_ID = 11155111
-const SEPOLIA_NETWORK = {
-  chainId: `0x${SEPOLIA_CHAIN_ID.toString(16)}`,
-  chainName: 'Sepolia Testnet',
+// Polygon mainnet configuration
+const POLYGON_CHAIN_ID = 137
+const POLYGON_NETWORK = {
+  chainId: `0x${POLYGON_CHAIN_ID.toString(16)}`,
+  chainName: 'Polygon Mainnet',
   nativeCurrency: {
-    name: 'Sepolia Ether',
-    symbol: 'SEP',
+    name: 'MATIC',
+    symbol: 'MATIC',
     decimals: 18,
   },
-  rpcUrls: ['https://rpc.sepolia.org'],
-  blockExplorerUrls: ['https://sepolia.etherscan.io'],
+  rpcUrls: ['https://polygon-rpc.com'],
+  blockExplorerUrls: ['https://polygonscan.com'],
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
@@ -36,16 +36,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
 
-  const switchToSepolia = async () => {
+  const switchToPolygon = async () => {
     if (typeof window.ethereum === "undefined") {
       throw new Error("MetaMask not installed")
     }
 
     try {
-      // Try to switch to Sepolia
+      // Try to switch to Polygon
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: SEPOLIA_NETWORK.chainId }],
+        params: [{ chainId: POLYGON_NETWORK.chainId }],
       })
     } catch (switchError: any) {
       // This error code indicates that the chain has not been added to MetaMask
@@ -53,15 +53,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         try {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
-            params: [SEPOLIA_NETWORK],
+            params: [POLYGON_NETWORK],
           })
         } catch (addError) {
-          console.error("Failed to add Sepolia network:", addError)
-          throw new Error("Failed to add Sepolia network to MetaMask")
+          console.error("Failed to add Polygon network:", addError)
+          throw new Error("Failed to add Polygon network to MetaMask")
         }
       } else {
-        console.error("Failed to switch to Sepolia:", switchError)
-        throw new Error("Failed to switch to Sepolia network")
+        console.error("Failed to switch to Polygon:", switchError)
+        throw new Error("Failed to switch to Polygon network")
       }
     }
   }
@@ -74,15 +74,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
     try {
       setIsConnecting(true)
-      
-      // Switch to Sepolia testnet
-      await switchToSepolia()
-      
+      // Switch to Polygon mainnet
+      await switchToPolygon()
       const provider = new ethers.BrowserProvider(window.ethereum)
       await provider.send("eth_requestAccounts", [])
       const signer = await provider.getSigner()
       const address = await signer.getAddress()
-
       setProvider(provider)
       setSigner(signer)
       setAccount(address)
@@ -139,7 +136,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         isConnecting,
         connect,
         disconnect,
-        switchToSepolia,
+        switchToPolygon,
       }}
     >
       {children}
