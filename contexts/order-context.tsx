@@ -53,76 +53,68 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const { account, signer, provider } = useWallet()
 
   const checkAndApproveToken = async (tokenAddress: string, amount: bigint) => {
+    console.log("[OrderContext] checkAndApproveToken called", { tokenAddress, amount })
     if (!signer || !account || !provider) {
+      console.error("[OrderContext] Wallet not connected", { signer, account, provider })
       throw new Error("Wallet not connected")
     }
     // Use Polygon chain ID
     const chainId = POLYGON_CHAIN_ID
     const limitOrderContractAddress = POLYGON_LIMIT_ORDER_CONTRACT
     const tokenContract = new ethers.Contract(tokenAddress, erc20AbiFragment, signer)
-
     try {
       // Check current allowance
       const currentAllowance = await tokenContract.allowance(account, limitOrderContractAddress)
-      
+      console.log("[OrderContext] Current allowance:", currentAllowance.toString())
       if (currentAllowance < amount) {
-        console.log(`Approving token ${tokenAddress} for amount ${amount}`)
-        
+        console.log(`[OrderContext] Approving token ${tokenAddress} for amount ${amount}`)
         // Approve the required amount (or MaxUint256 for unlimited approval)
         const approveTx = await tokenContract.approve(limitOrderContractAddress, amount)
-        
-        console.log("Approval transaction sent:", approveTx.hash)
+        console.log("[OrderContext] Approval transaction sent:", approveTx.hash)
         await approveTx.wait()
-        console.log("Token approval confirmed")
+        console.log("[OrderContext] Token approval confirmed")
       } else {
-        console.log("Token already approved")
+        console.log("[OrderContext] Token already approved")
       }
     } catch (error) {
-      console.error("Token approval failed:", error)
+      console.error("[OrderContext] Token approval failed:", error)
       throw new Error(`Failed to approve token: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
   const createOrder = async (orderData: Partial<Order>) => {
+    console.log("[OrderContext] createOrder called", orderData)
     if (!signer || !account || !provider) {
+      console.error("[OrderContext] Wallet not connected", { signer, account, provider })
       throw new Error("Wallet not connected")
     }
-
     try {
       setIsLoading(true)
-
       // Validate required fields
       if (!orderData.makerAsset || !orderData.takerAsset || !orderData.makingAmount || !orderData.takingAmount) {
+        console.error("[OrderContext] Missing required order data", orderData)
         throw new Error("Missing required order data")
       }
-
       // Convert string amounts to BigInt
       const makingAmount = BigInt(orderData.makingAmount)
       const takingAmount = BigInt(orderData.takingAmount)
-      
       // Check and approve token if needed
       await checkAndApproveToken(orderData.makerAsset, makingAmount)
-      
       // Create expiration timestamp (24 hours from now)
       const expiresIn = BigInt(86400) // 24 hours in seconds
       const expiration = BigInt(Math.floor(Date.now() / 1000)) + expiresIn
-      
       // Generate unique salt
       const salt = BigInt(Math.floor(Math.random() * 1e16)) // Larger salt for better uniqueness
-      
       // Create MakerTraits using the builder pattern
       const makerTraits = new MakerTraits(BigInt(0))
         .withExpiration(expiration)
         .allowPartialFills()
         .allowMultipleFills()
-
-      console.log("MakerTraits object:", makerTraits)
-      console.log("MakerTraits toString():", makerTraits.toString())
-
+      console.log("[OrderContext] MakerTraits object:", makerTraits)
+      console.log("[OrderContext] MakerTraits toString():", makerTraits.toString())
       // Convert makerTraits to a proper string representation
       const makerTraitsString = makerTraits.toString()
-      console.log("MakerTraits string:", makerTraitsString)
-
+      console.log("[OrderContext] MakerTraits string:", makerTraitsString)
       // Create the LimitOrder using the SDK
       const order = new LimitOrder({
         makerAsset: new Address(orderData.makerAsset),
@@ -133,64 +125,57 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         receiver: new Address(account),
         salt
       })
-
       // Get the domain for Polygon mainnet
       const chainId = POLYGON_CHAIN_ID
       const domain = getLimitOrderV4Domain(chainId)
-      
       // Get typed data for signing
       const typedData = order.getTypedData(Number(domain.chainId))
-
       // Adapt domain format for signTypedData
       const domainForSignature = {
         ...typedData.domain,
         chainId: chainId
       }
-
       // Sign the order using EIP-712
+      console.log("[OrderContext] Signing order with domain:", domainForSignature)
       const signature = await signer.signTypedData(
         domainForSignature,
         { Order: typedData.types.Order },
         typedData.message
       )
-      
       // Get the order hash
       const orderHash = order.getOrderHash(Number(domain.chainId))
-
       // Use our custom API route for submission (which handles CORS and proper formatting)
-      console.log("Submitting order using our API route...")
-      
+      console.log("[OrderContext] Submitting order using our API route...")
+      const payload = {
+        orderHash,
+        signature,
+        data: {
+          makerAsset: orderData.makerAsset,
+          takerAsset: orderData.takerAsset,
+          makingAmount: makingAmount.toString(),
+          takingAmount: takingAmount.toString(),
+          maker: account,
+          receiver: account,
+          salt: salt.toString(),
+          makerTraits: makerTraitsString,
+          extension: "0x"
+        }
+      }
+      console.log("[OrderContext] Order submission payload:", payload)
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          orderHash,
-          signature,
-          data: {
-            makerAsset: orderData.makerAsset,
-            takerAsset: orderData.takerAsset,
-            makingAmount: makingAmount.toString(),
-            takingAmount: takingAmount.toString(),
-            maker: account,
-            receiver: account,
-            salt: salt.toString(),
-            makerTraits: makerTraitsString,
-            extension: "0x"
-          }
-        }),
+        body: JSON.stringify(payload),
       })
-
       if (!response.ok) {
         const errorData = await response.json()
-        console.error("Order creation failed:", errorData)
+        console.error("[OrderContext] Order creation failed:", errorData)
         throw new Error(errorData.message || "Failed to create order")
       }
-
       const result = await response.json()
-      console.log("Order submitted successfully:", result)
-
+      console.log("[OrderContext] Order submitted successfully:", result)
       // Add to local state
       const newOrder: Order = {
         id: `${salt}-${Date.now()}`,
@@ -203,16 +188,19 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         salt: salt.toString(),
         expiration: Number(expiration),
         signature,
-        status: "active",
+        status: "active" as Order["status"],
         createdAt: Date.now(),
         orderHash,
         makerTraits: makerTraitsString // Use the string representation
       }
-
-      setActiveOrders((prev) => [...prev, newOrder])
+      setActiveOrders((prev) => {
+        const updated = [...prev, newOrder]
+        console.log("[OrderContext] setActiveOrders:", updated)
+        return updated
+      })
       return result
     } catch (error) {
-      console.error("Failed to create order:", error)
+      console.error("[OrderContext] Failed to create order:", error)
       throw error
     } finally {
       setIsLoading(false)
@@ -220,30 +208,35 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }
 
   const cancelOrder = async (orderId: string) => {
+    console.log("[OrderContext] cancelOrder called", { orderId })
     if (!signer || !account) {
+      console.error("[OrderContext] Wallet not connected", { signer, account })
       throw new Error("Wallet not connected")
     }
-
     try {
       setIsLoading(true)
-
       // Find the order to cancel
       const order = activeOrders.find((o) => o.id === orderId)
       if (!order) {
+        console.error("[OrderContext] Order not found", { orderId, activeOrders })
         throw new Error("Order not found")
       }
-
       // Note: Actual order cancellation would require an on-chain transaction
       // This is a simplified version that just moves the order to history
-      console.log("Cancelling order:", orderId)
-
-      // Move order from active to history
-      setActiveOrders((prev) => prev.filter((o) => o.id !== orderId))
-      setOrderHistory((prev) => [...prev, { ...order, status: "cancelled" }])
-      
-      console.log("Order cancelled successfully")
+      console.log("[OrderContext] Cancelling order:", orderId)
+      setActiveOrders((prev) => {
+        const updated = prev.filter((o) => o.id !== orderId)
+        console.log("[OrderContext] setActiveOrders after cancel:", updated)
+        return updated
+      })
+      setOrderHistory((prev) => {
+        const updated = [...prev, { ...order, status: "cancelled" as Order["status"] }]
+        console.log("[OrderContext] setOrderHistory after cancel:", updated)
+        return updated
+      })
+      console.log("[OrderContext] Order cancelled successfully")
     } catch (error) {
-      console.error("Failed to cancel order:", error)
+      console.error("[OrderContext] Failed to cancel order:", error)
       throw error
     } finally {
       setIsLoading(false)
@@ -251,22 +244,21 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }
 
   const refreshOrders = async () => {
-    if (!account) return
-
+    console.log("[OrderContext] refreshOrders called")
+    if (!account) {
+      console.warn("[OrderContext] refreshOrders: No account connected")
+      return
+    }
     try {
       setIsLoading(true)
-
       // Fetch orders from our API
       const response = await fetch(`/api/orders?address=${account}&limit=100`)
-      
       if (!response.ok) {
-        console.warn("Failed to fetch orders from API")
+        console.warn("[OrderContext] Failed to fetch orders from API", response.status)
         return
       }
-
       const apiResponse = await response.json()
-      console.log("Fetched orders:", apiResponse)
-
+      console.log("[OrderContext] Fetched orders:", apiResponse)
       // Process orders from 1inch API format
       if (apiResponse && Array.isArray(apiResponse)) {
         const processedOrders: Order[] = apiResponse.map((apiOrder: any) => ({
@@ -287,16 +279,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           orderHash: apiOrder.orderHash,
           makerTraits: apiOrder.data?.makerTraits
         }))
-
         // Separate active and historical orders
         const active = processedOrders.filter(order => order.status === 'active')
         const history = processedOrders.filter(order => order.status !== 'active')
-
         setActiveOrders(active)
         setOrderHistory(history)
+        console.log("[OrderContext] setActiveOrders after refresh:", active)
+        console.log("[OrderContext] setOrderHistory after refresh:", history)
       }
     } catch (error) {
-      console.error("Failed to refresh orders:", error)
+      console.error("[OrderContext] Failed to refresh orders:", error)
     } finally {
       setIsLoading(false)
     }
