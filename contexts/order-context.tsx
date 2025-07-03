@@ -42,7 +42,8 @@ const erc20AbiFragment = [
 
 // Polygon mainnet configuration
 const POLYGON_CHAIN_ID = 137
-const POLYGON_LIMIT_ORDER_CONTRACT = "0x1111111254EEB25477B68fb85Ed929f73A960582" // 1inch Limit Order Protocol v4 on Polygon
+// Correct 1inch Limit Order Protocol v4 contract address for Polygon
+const POLYGON_LIMIT_ORDER_CONTRACT = "0x111111125421ca6dc452d289314280a0f8842a65" // 1inch Limit Order Protocol v4 on Polygon
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined)
 
@@ -58,9 +59,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       console.error("[OrderContext] Wallet not connected", { signer, account, provider })
       throw new Error("Wallet not connected")
     }
-    // Use Polygon chain ID
+    // Use Polygon chain ID and get contract address from SDK domain helper
     const chainId = POLYGON_CHAIN_ID
-    const limitOrderContractAddress = POLYGON_LIMIT_ORDER_CONTRACT
+    const domain = getLimitOrderV4Domain(chainId)
+    const limitOrderContractAddress = domain.verifyingContract
+    console.log("[OrderContext] LimitOrder domain for approval:", domain)
+    if (limitOrderContractAddress.toLowerCase() !== POLYGON_LIMIT_ORDER_CONTRACT.toLowerCase()) {
+      console.warn("[OrderContext] WARNING: SDK returned unexpected contract address for Polygon!", limitOrderContractAddress)
+    }
     const tokenContract = new ethers.Contract(tokenAddress, erc20AbiFragment, signer)
     try {
       // Check current allowance
@@ -98,23 +104,27 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       // Convert string amounts to BigInt
       const makingAmount = BigInt(orderData.makingAmount)
       const takingAmount = BigInt(orderData.takingAmount)
+      // Get domain and contract address from SDK
+      const chainId = POLYGON_CHAIN_ID
+      const domain = getLimitOrderV4Domain(chainId)
+      const limitOrderContractAddress = domain.verifyingContract
+      console.log("[OrderContext] LimitOrder domain for signing:", domain)
+      if (limitOrderContractAddress.toLowerCase() !== POLYGON_LIMIT_ORDER_CONTRACT.toLowerCase()) {
+        console.warn("[OrderContext] WARNING: SDK returned unexpected contract address for Polygon!", limitOrderContractAddress)
+      }
       // Check and approve token if needed
       await checkAndApproveToken(orderData.makerAsset, makingAmount)
       // Create expiration timestamp (24 hours from now)
-      const expiresIn = BigInt(86400) // 24 hours in seconds
+      const expiresIn = 86400n // 24 hours in seconds
       const expiration = BigInt(Math.floor(Date.now() / 1000)) + expiresIn
       // Generate unique salt
       const salt = BigInt(Math.floor(Math.random() * 1e16)) // Larger salt for better uniqueness
-      // Create MakerTraits using the builder pattern
-      const makerTraits = new MakerTraits(BigInt(0))
-        .withExpiration(expiration)
-        .allowPartialFills()
-        .allowMultipleFills()
-      console.log("[OrderContext] MakerTraits object:", makerTraits)
-      console.log("[OrderContext] MakerTraits toString():", makerTraits.toString())
-      // Convert makerTraits to a proper string representation
-      const makerTraitsString = makerTraits.toString()
-      console.log("[OrderContext] MakerTraits string:", makerTraitsString)
+      // Use SDK MakerTraits builder for correct bitmask
+      let makerTraits = new MakerTraits(0n);
+      makerTraits.withExpiration(expiration);
+      makerTraits.allowPartialFills();
+      makerTraits.allowMultipleFills();
+      console.log("makerTraits.asBigInt():", makerTraits.asBigInt().toString());
       // Create the LimitOrder using the SDK
       const order = new LimitOrder({
         makerAsset: new Address(orderData.makerAsset),
@@ -122,18 +132,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         makingAmount,
         takingAmount,
         maker: new Address(account),
-        receiver: new Address(account),
+        receiver: new Address(account), // Always set to user's address
         salt
-      })
-      // Get the domain for Polygon mainnet
-      const chainId = POLYGON_CHAIN_ID
-      const domain = getLimitOrderV4Domain(chainId)
+      }, makerTraits)
       // Get typed data for signing
       const typedData = order.getTypedData(Number(domain.chainId))
       // Adapt domain format for signTypedData
       const domainForSignature = {
         ...typedData.domain,
-        chainId: chainId
+        chainId: chainId,
+        verifyingContract: POLYGON_LIMIT_ORDER_CONTRACT // always use the correct Polygon contract
       }
       // Sign the order using EIP-712
       console.log("[OrderContext] Signing order with domain:", domainForSignature)
@@ -144,23 +152,20 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       )
       // Get the order hash
       const orderHash = order.getOrderHash(Number(domain.chainId))
-      // Use our custom API route for submission (which handles CORS and proper formatting)
-      console.log("[OrderContext] Submitting order using our API route...")
-      const payload = {
+      // Build the order payload
+      const builtOrder = order.build() as any
+      // Do not add or overwrite any fields in builtOrder
+      console.log('order.build() output:', builtOrder)
+      let data = { ...builtOrder };
+      if ('extension' in builtOrder) {
+        data.extension = builtOrder.extension;
+      }
+      let payload = {
         orderHash,
         signature,
-        data: {
-          makerAsset: orderData.makerAsset,
-          takerAsset: orderData.takerAsset,
-          makingAmount: makingAmount.toString(),
-          takingAmount: takingAmount.toString(),
-          maker: account,
-          receiver: account,
-          salt: salt.toString(),
-          makerTraits: makerTraitsString,
-          extension: "0x"
-        }
+        data
       }
+      console.log("[OrderContext] Submitting order using our API route...")
       console.log("[OrderContext] Order submission payload:", payload)
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -191,7 +196,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         status: "active" as Order["status"],
         createdAt: Date.now(),
         orderHash,
-        makerTraits: makerTraitsString // Use the string representation
+        makerTraits: makerTraits.asBigInt().toString()
       }
       setActiveOrders((prev) => {
         const updated = [...prev, newOrder]
