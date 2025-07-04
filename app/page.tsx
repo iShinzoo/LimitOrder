@@ -14,17 +14,17 @@ export default function Home() {
     <WalletProvider>
       <PriceProvider>
         <OrderProvider>
-          <div className="min-h-screen bg-background">
+          <div className="min-h-screen bg-[#0a0e1a] flex flex-col">
             <Header />
-            <main className="container mx-auto px-4 py-8 max-w-6xl">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1 space-y-6">
-                  <PriceDisplay />
-                  <OrderForm />
-                </div>
-                <div className="lg:col-span-2 space-y-6">
-                  <ActiveOrders />
-                  <OrderHistory />
+            <main className="flex-1">
+              <div className="container mx-auto px-6 py-8 max-w-7xl">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                  <div className="lg:col-span-2">
+                    <OrderForm />
+                  </div>
+                  <div className="lg:col-span-3">
+                    <ActiveOrders />
+                  </div>
                 </div>
               </div>
             </main>

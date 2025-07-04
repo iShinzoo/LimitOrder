@@ -3,18 +3,11 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TokenPairSelector, Token } from "@/components/token-pair-selector"
 import { formatPrice, formatTimestamp } from "@/lib/utils"
 import { RefreshCw, TrendingUp, AlertCircle, Settings } from "lucide-react"
 import { toast } from "sonner"
 
-interface Token {
-  symbol: string
-  name: string
-  address: string
-  decimals: number
-  logoURI: string
-}
 
 const CACHE_KEY = "price-cache-v1"
 const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours in ms
@@ -39,22 +32,22 @@ function setCache(base: string, quote: string, price: string, timestamp: number)
 }
 
 export function PriceDisplay() {
-  const [tokens, setTokens] = useState<Token[]>([])
-  const [base, setBase] = useState<string>("")
-  const [quote, setQuote] = useState<string>("")
+const [baseToken, setBaseToken] = useState<Token | null>(null)
+  const [quoteToken, setQuoteToken] = useState<Token | null>(null)
   const [price, setPrice] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [timestamp, setTimestamp] = useState<number | null>(null)
 
-  // Load token list
+// Load default tokens
   useEffect(() => {
     fetch("/tokenlist.json")
       .then((res) => res.json())
       .then((data) => {
-        setTokens(data.tokens)
-        setBase(data.tokens[0].address)
-        setQuote(data.tokens[1].address)
+        const defaultBase = data.tokens[0]
+        const defaultQuote = data.tokens[1]
+        setBaseToken(defaultBase)
+        setQuoteToken(defaultQuote)
       })
   }, [])
 
@@ -80,6 +73,9 @@ export function PriceDisplay() {
     }
   }
 
+  // TODO: PRICE_LOGIC_FIX - Implement real-time price updates instead of 24h cache
+  // TODO: PRICE_LOGIC_FIX - Add websocket connection for live price feeds
+  // TODO: PRICE_LOGIC_FIX - Integrate with order form for suggested pricing
   // Fetch price for selected pair, but only if 24h have passed or no cache
   const fetchPrice = async (baseAddr: string, quoteAddr: string, force = false) => {
     setIsLoading(true)
@@ -112,50 +108,32 @@ export function PriceDisplay() {
     }
   }
 
-  // On token change, use cache if available, otherwise fetch
+// On token change, use cache if available, otherwise fetch
   useEffect(() => {
-    if (base && quote && base !== quote) {
-      const cache = getCache(base, quote)
+    if (baseToken && quoteToken && baseToken.address !== quoteToken.address) {
+      const cache = getCache(baseToken.address, quoteToken.address)
       if (cache && Date.now() - cache.timestamp < CACHE_TTL) {
         setPrice(cache.price)
         setTimestamp(cache.timestamp)
       } else {
-        fetchPrice(base, quote)
+        fetchPrice(baseToken.address, quoteToken.address)
       }
     }
-  }, [base, quote])
+  }, [baseToken, quoteToken])
 
-  const baseToken = tokens.find((t) => t.address === base)
-  const quoteToken = tokens.find((t) => t.address === quote)
 
   return (
-    <Card>
+    <Card className="max-w-md mx-auto mt-10 rounded-3xl shadow-lg bg-card border-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <span>When 1</span>
-          <Select value={base} onValueChange={setBase}>
-            <SelectTrigger className="w-28">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {tokens.map((token) => (
-                <SelectItem key={token.address} value={token.address}>
-                  <span className="inline-flex items-center gap-2">
-                    <img src={token.logoURI} alt={token.symbol} className="w-4 h-4 rounded-full" />
-                    {token.symbol}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span>is worth</span>
+          <span className="text-muted-foreground">Price Display</span>
         </CardTitle>
         <div className="flex space-x-2">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={testEnvironment}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 rounded-full hover:bg-[hsl(var(--accent))]/10"
             title="Test Environment"
           >
             <Settings className="h-4 w-4" />
@@ -163,46 +141,49 @@ export function PriceDisplay() {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => fetchPrice(base, quote, true)} 
+            onClick={() => baseToken && quoteToken && fetchPrice(baseToken.address, quoteToken.address, true)}
             disabled={isLoading} 
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 rounded-full hover:bg-[hsl(var(--accent))]/10"
             title="Refresh Price (force update)"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-2">
-          <span className="text-4xl font-bold">
+        <TokenPairSelector
+          baseToken={baseToken}
+          quoteToken={quoteToken}
+          onChange={(base, quote) => {
+            setBaseToken(base)
+            setQuoteToken(quote)
+          }}
+          className="mb-4"
+          baseLabel="Base Token"
+          quoteLabel="Quote Token"
+        />
+        
+        <div className="text-center mb-4">
+          <div className="text-sm text-muted-foreground mb-2">
+            When 1 {baseToken?.symbol || "---"} is worth
+          </div>
+          <div className="text-5xl font-bold text-white mb-2">
             {error ? "-" : price ? formatPrice(price, quoteToken?.decimals || 2) : "..."}
-          </span>
-          {quoteToken && (
-            <Select value={quote} onValueChange={setQuote}>
-              <SelectTrigger className="w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {tokens.filter((t) => t.address !== base).map((token) => (
-                  <SelectItem key={token.address} value={token.address}>
-                    <span className="inline-flex items-center gap-2">
-                      <img src={token.logoURI} alt={token.symbol} className="w-4 h-4 rounded-full" />
-                      {token.symbol}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          </div>
+          <div className="text-lg text-muted-foreground">
+            {quoteToken?.symbol || "---"}
+          </div>
         </div>
         {error && (
           <div className="flex items-center space-x-2 text-destructive text-sm mt-2">
             <AlertCircle className="h-4 w-4" />
-            <span>Error: {error}</span>
+            <span>{error}</span>
           </div>
         )}
-        {timestamp && (
-          <div className="text-xs text-muted-foreground mt-1">Last updated: {formatTimestamp(timestamp)}</div>
+        {timestamp && !error && (
+          <div className="text-xs text-muted-foreground text-center mt-1">
+            Last updated: {formatTimestamp(timestamp)}
+          </div>
         )}
       </CardContent>
     </Card>
