@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,6 +35,9 @@ export function OrderForm() {
   const [amount, setAmount] = useState("")
   const [expiration, setExpiration] = useState("1d")
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [priceData, setPriceData] = useState<{ price: string; inverse: string } | null>(null)
+  const [isPriceLoading, setIsPriceLoading] = useState(false)
+  const [priceError, setPriceError] = useState<string | null>(null)
 
   // Load token list
   useEffect(() => {
@@ -53,6 +56,40 @@ export function OrderForm() {
         toast.error("Failed to load token list")
       })
   }, [])
+
+  // Fetch spot price for selected token pair
+  const fetchPrice = useCallback(async (base: Token | null, quote: Token | null) => {
+    if (!base || !quote) return
+    setIsPriceLoading(true)
+    setPriceError(null)
+    try {
+      const res = await fetch(`/api/price?base=${base.address}&quote=${quote.address}`)
+      if (!res.ok) throw new Error("Failed to fetch price")
+      const data = await res.json()
+      const price = parseFloat(data.price)
+      setPriceData({
+        price: price.toString(),
+        inverse: price !== 0 ? (1 / price).toString() : "Infinity",
+      })
+    } catch (err) {
+      setPriceError("Failed to fetch price")
+      setPriceData(null)
+    } finally {
+      setIsPriceLoading(false)
+    }
+  }, [])
+
+  // Fetch price on token change
+  useEffect(() => {
+    fetchPrice(payToken, receiveToken)
+  }, [payToken, receiveToken, fetchPrice])
+
+  // Switch pay/receive tokens
+  const handleSwitch = () => {
+    setPayToken(receiveToken)
+    setReceiveToken(payToken)
+    // Price will auto-update due to useEffect
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -147,29 +184,30 @@ export function OrderForm() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-400">When 1 {payToken ? payToken.symbol : "ETH"} is worth</span>
-              <button className="text-sm text-blue-400 hover:text-blue-300">Switch</button>
+              <button type="button" className="text-sm text-blue-400 hover:text-blue-300" onClick={handleSwitch}>Switch</button>
             </div>
             <div className="text-3xl font-bold text-white">
-              {price || '0.00'}
+              {isPriceLoading ? <span className="text-gray-400 text-base">Loading...</span> : priceData ? priceData.price : '0.00'}
             </div>
             <div className="text-gray-400">
               {receiveToken ? receiveToken.symbol : "USDC"}
             </div>
+            {priceError && <div className="text-xs text-red-400">{priceError}</div>}
           </div>
           
           {/* Exchange Rate Display */}
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-400">When 1 {receiveToken ? receiveToken.symbol : "USDC"} is worth</span>
-            <span className="text-white font-semibold">Infinity</span>
+            <span className="text-white font-semibold">{isPriceLoading ? <span className="text-gray-400">Loading...</span> : priceData ? priceData.inverse : 'Infinity'}</span>
             <span className="text-gray-400">{payToken ? payToken.symbol : "ETH"}</span>
           </div>
           
           {/* Price Preset Buttons */}
           <div className="flex gap-2">
-            <button className="px-3 py-1 rounded-lg bg-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-600">Market</button>
-            <button className="px-3 py-1 rounded-lg bg-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-600">+1%</button>
-            <button className="px-3 py-1 rounded-lg bg-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-600">+5%</button>
-            <button className="px-3 py-1 rounded-lg bg-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-600">+10%</button>
+            <button type="button" className="px-3 py-1 rounded-lg bg-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-600" onClick={() => priceData && setPrice(priceData.price)}>Market</button>
+            <button type="button" className="px-3 py-1 rounded-lg bg-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-600" onClick={() => priceData && setPrice((parseFloat(priceData.price) * 1.01).toFixed(6))}>+1%</button>
+            <button type="button" className="px-3 py-1 rounded-lg bg-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-600" onClick={() => priceData && setPrice((parseFloat(priceData.price) * 1.05).toFixed(6))}>+5%</button>
+            <button type="button" className="px-3 py-1 rounded-lg bg-gray-700 text-gray-300 text-sm font-medium hover:bg-gray-600" onClick={() => priceData && setPrice((parseFloat(priceData.price) * 1.10).toFixed(6))}>+10%</button>
           </div>
         </div>
       </CardHeader>

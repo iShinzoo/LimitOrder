@@ -5,49 +5,49 @@
       "name": "Wrapped Matic",
       "address": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
       "decimals": 18,
-      "logoURI": "https://cryptologos.cc/logos/polygon-matic-logo.png"
+      "logoURI": "/placeholder-logo.png"
     },
     {
       "symbol": "MATIC",
       "name": "Polygon",
       "address": "0x0000000000000000000000000000000000001010",
       "decimals": 18,
-      "logoURI": "https://cryptologos.cc/logos/polygon-matic-logo.png"
+      "logoURI": "/placeholder-logo.png"
     },
     {
       "symbol": "WETH",
       "name": "Wrapped Ether",
       "address": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
       "decimals": 18,
-      "logoURI": "https://cryptologos.cc/logos/ethereum-eth-logo.png"
+      "logoURI": "/placeholder-logo.png"
     },
     {
       "symbol": "USDC",
       "name": "USD Coin",
       "address": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
       "decimals": 6,
-      "logoURI": "https://cryptologos.cc/logos/usd-coin-usdc-logo.png"
+      "logoURI": "/placeholder-logo.png"
     },
     {
       "symbol": "USDT",
       "name": "Tether",
       "address": "0x3813e82e6f7098b9583FC0F33a962D02018B6803",
       "decimals": 6,
-      "logoURI": "https://cryptologos.cc/logos/tether-usdt-logo.png"
+      "logoURI": "/placeholder-logo.png"
     },
     {
       "symbol": "DAI",
       "name": "Dai",
       "address": "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063",
       "decimals": 18,
-      "logoURI": "https://cryptologos.cc/logos/multi-collateral-dai-dai-logo.png"
+      "logoURI": "/placeholder-logo.png"
     },
     {
       "symbol": "WBTC",
       "name": "Wrapped Bitcoin",
       "address": "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6",
       "decimals": 8,
-      "logoURI": "https://cryptologos.cc/logos/wrapped-bitcoin-wbtc-logo.png"
+      "logoURI": "/placeholder-logo.png"
     }
   ]
 } 

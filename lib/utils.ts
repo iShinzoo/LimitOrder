@@ -6,9 +6,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatPrice(price: string, decimals = 6): string {
-  const num = Number.parseFloat(price)
+  // Convert stringified big integer to human-readable float
+  let num = 0
+  try {
+    num = Number(price) / Math.pow(10, decimals)
+  } catch {
+    num = 0
+  }
   if (isNaN(num)) return "0.00"
-
   return num.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 6,

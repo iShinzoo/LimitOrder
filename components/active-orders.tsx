@@ -38,37 +38,36 @@ export function ActiveOrders() {
     return tokens.find(t => t.address.toLowerCase() === address.toLowerCase())
   }
 
-  // TODO: ORDER_TYPE_DETECTION_FIX - Improve order type detection logic for all token pairs
-  // TODO: ORDER_TYPE_DETECTION_FIX - Add support for complex order types (limit, market, stop)
   const getOrderType = (order: any) => {
     const makerToken = getTokenInfo(order.makerAsset)
     const takerToken = getTokenInfo(order.takerAsset)
-    
-    if (makerToken?.symbol === "WETH" && takerToken?.symbol === "USDC") {
-      return "SELL"
-    } else if (makerToken?.symbol === "USDC" && takerToken?.symbol === "WETH") {
-      return "BUY"
-    }
-    return "UNKNOWN"
+    if (!makerToken || !takerToken) return "UNKNOWN"
+    // If the user is selling the makerToken for takerToken, it's a SELL
+    // If the user is buying the makerToken with takerToken, it's a BUY
+    // Use a simple convention: if makerToken is a stablecoin, it's a BUY; otherwise, SELL
+    const stablecoins = ["USDC", "USDT", "DAI"]
+    if (stablecoins.includes(makerToken.symbol)) return "BUY"
+    if (stablecoins.includes(takerToken.symbol)) return "SELL"
+    // Otherwise, use alphabetical order for consistency
+    return makerToken.symbol < takerToken.symbol ? "SELL" : "BUY"
   }
 
-  // TODO: PRICE_DISPLAY_FIX - Implement proper decimal handling for different token precisions
-  // TODO: PRICE_DISPLAY_FIX - Add currency formatting and localization support
   const getOrderDetails = (order: any) => {
     const makerToken = getTokenInfo(order.makerAsset)
     const takerToken = getTokenInfo(order.takerAsset)
-    
     if (!makerToken || !takerToken) {
       return {
-        amount: formatPrice(order.makingAmount, 18),
-        price: formatPrice(order.takingAmount, 6),
+        amount: "?",
+        price: "?",
         symbol: "Unknown"
       }
     }
-
-    const amount = formatPrice(order.makingAmount, makerToken.decimals)
-    const price = formatPrice(order.takingAmount, takerToken.decimals)
-    
+    // Validate and format amounts
+    let amount = formatPrice(order.makingAmount, makerToken.decimals)
+    let price = formatPrice(order.takingAmount, takerToken.decimals)
+    // Cap absurdly large values
+    if (parseFloat(amount.replace(/,/g, '')) > 1e9) amount = '>1B'
+    if (parseFloat(price.replace(/,/g, '')) > 1e9) price = '>1B'
     return {
       amount,
       price,
